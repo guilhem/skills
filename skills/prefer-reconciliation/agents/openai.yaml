@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reconciliation First"
+  short_description: "Converge controllers toward desired state"
+  default_prompt: "Use $prefer-reconciliation to simplify this design around desired state and idempotent convergence."

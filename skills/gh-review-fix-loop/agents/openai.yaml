@@ -1,0 +1,4 @@
+interface:
+  display_name: "GH Review Fix Loop"
+  short_description: "Triage and close GitHub PR feedback"
+  default_prompt: "Use $gh-review-fix-loop to resolve this PR's feedback through scoped fixes, validation, publication, and thread closure."
