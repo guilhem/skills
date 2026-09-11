@@ -1,0 +1,4 @@
+interface:
+  display_name: "Double Review Loop"
+  short_description: "Run an explicit two-reviewer gate"
+  default_prompt: "Use $double-review-loop only for an explicitly requested two-reviewer gate on a frozen artifact."
