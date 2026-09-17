@@ -1,0 +1,20 @@
+{
+  "name": "guilhem-skills",
+  "interface": {
+    "displayName": "Guilhem Skills"
+  },
+  "plugins": [
+    {
+      "name": "implementation-plan",
+      "source": {
+        "source": "local",
+        "path": "./plugins/implementation-plan"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
