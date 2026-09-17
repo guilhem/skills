@@ -1,0 +1,20 @@
+{
+  "name": "implementation-plan",
+  "version": "0.1.0",
+  "description": "Write and revise implementation plans that stand alone without conversation history.",
+  "author": {
+    "name": "Guilhem Lettron"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Implementation Plan",
+    "shortDescription": "Implementation plans ready for a fresh agent.",
+    "longDescription": "Draft and revise repository-grounded implementation plans, with a Plan mode reminder.",
+    "developerName": "Guilhem Lettron",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use $implementation-plan to draft an implementation plan for this repository."
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/guilhem/skills"
+}
