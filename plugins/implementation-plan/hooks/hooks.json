@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf '%s\\n' 'Plan mode: use $implementation-plan.'",
+            "command": "printf '%s\\n' 'If already in Plan mode, use $implementation-plan.'",
             "timeout": 5
           }
         ]

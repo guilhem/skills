@@ -52,11 +52,13 @@ the standalone skill is named `implementation-plan`.
 The plugin adds only a `UserPromptSubmit` reminder:
 
 ```text
-Plan mode: use $implementation-plan.
+If already in Plan mode, use $implementation-plan.
 ```
 
-It emits that line on every user prompt; the agent applies the condition using
-its actual mode. The hook does not inspect prompt keywords or `permission_mode`.
+It emits that reminder on every user prompt. “If already” makes skill use
+conditional on Plan mode being active; it does not ask the agent to switch modes.
+Automatic skill selection for an actual planning request outside Plan mode
+remains available. The hook does not inspect prompt keywords or `permission_mode`.
 This initial version requires a POSIX shell. All plan-writing rules live in the
 skill, not the hook.
 
