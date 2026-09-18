@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf '%s\\n' 'Plan mode: use $implementation-plan.'",
+            "command": "printf '%s\\n' 'If the current collaboration mode is already Plan, use $implementation-plan when drafting or revising an implementation plan. This reminder does not change modes or request a plan.'",
             "timeout": 5
           }
         ]

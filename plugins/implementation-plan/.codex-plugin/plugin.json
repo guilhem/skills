@@ -1,6 +1,6 @@
 {
   "name": "implementation-plan",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Write and revise implementation plans that stand alone without conversation history.",
   "author": {
     "name": "Guilhem Lettron"
