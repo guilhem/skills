@@ -171,7 +171,7 @@ func (r *FooReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 | Unnecessary API calls | `SetStatusCondition` returns `false` when nothing changed → skip `Update()` |
 | Status update failure | Error returned explicitly → triggers requeue with backoff |
 | No tracking variable | Single `if SetStatusCondition(...) { Update() }` — no `statusChanged` bool to maintain |
-| Multiple conditions | Chain: `changed := meta.SetStatusCondition(...) \|\| meta.SetStatusCondition(...)` |
+| Multiple conditions | Call `SetStatusCondition` for each condition in a separate statement, then combine the returned booleans with logical OR |
 
 ### Multiple conditions: update after each action
 

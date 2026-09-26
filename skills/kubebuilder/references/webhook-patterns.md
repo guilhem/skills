@@ -112,9 +112,10 @@ func (v *MemcachedCustomValidator) validate(m *cachev1.Memcached) (admission.War
 ## Register Webhooks in main.go
 
 ```go
-if err = webhookserver.Register(
-    webhook.NewCustomDefaulterWebhook(&MemcachedCustomDefaulter{}),
-); err != nil {
+if err = ctrl.NewWebhookManagedBy(mgr, &cachev1.Memcached{}).
+    WithCustomDefaulter(&MemcachedCustomDefaulter{}).
+    WithCustomValidator(&MemcachedCustomValidator{}).
+    Complete(); err != nil {
     setupLog.Error(err, "unable to create webhook", "webhook", "Memcached")
     os.Exit(1)
 }
