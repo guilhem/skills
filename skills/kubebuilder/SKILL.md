@@ -167,10 +167,10 @@ linters:
         settings:
           linters: {}
           lintersConfig: {}
-exclusions:
-  rules:
-    - linters: [kubeapilinter]
-      path-except: api/*
+  exclusions:
+    rules:
+      - linters: [kubeapilinter]
+        path-except: api/*
 ```
 
 Run KAL after `make generate` / `make manifests` and fix findings before writing tests.
