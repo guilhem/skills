@@ -24,6 +24,12 @@ review threads with pagination, including resolved or outdated discussions when
 relevant to earlier corrections. Use the current diff, linked commits, checks, and
 product constraints as evidence. Memory may locate history but does not prove it.
 
+If a CI job does not start or has no steps, inspect its check-run annotations
+before looking for logs or waiting. Use that evidence to distinguish code failures
+from external blockers such as quota, billing, or permissions. Do not rerun
+blindly or change code to address an external blocker; report it without
+claiming CI passed.
+
 Classify findings before editing:
 
 - `pertinent`: a demonstrated defect or violated contract within the requested scope.
