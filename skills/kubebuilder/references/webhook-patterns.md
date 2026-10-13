@@ -123,7 +123,8 @@ if err = ctrl.NewWebhookManagedBy(mgr, &cachev1.Memcached{}).
 
 ## Conversion Webhooks (Multi-Version)
 
-For multi-version CRDs, implement hub-and-spoke conversion:
+When versions need field conversion, implement hub-and-spoke conversion. Identical
+schemas can use `spec.conversion.strategy: None`, which only changes `apiVersion`.
 
 ```go
 // Hub version (storage version)
@@ -132,6 +133,7 @@ func (m *Memcached) Hub() {}
 // Spoke version converts to/from hub
 func (m *MemcachedV1beta1) ConvertTo(dstRaw conversion.Hub) error {
     dst := dstRaw.(*Memcached)
+    dst.ObjectMeta = *m.ObjectMeta.DeepCopy()
     // Convert fields from v1beta1 to v1
     dst.Spec.Size = m.Spec.Replicas  // field renamed
     return nil
@@ -139,11 +141,68 @@ func (m *MemcachedV1beta1) ConvertTo(dstRaw conversion.Hub) error {
 
 func (m *MemcachedV1beta1) ConvertFrom(srcRaw conversion.Hub) error {
     src := srcRaw.(*Memcached)
+    m.ObjectMeta = *src.ObjectMeta.DeepCopy()
     // Convert fields from v1 to v1beta1
     m.Spec.Replicas = src.Spec.Size
     return nil
 }
 ```
+
+This abbreviated example maps only `Replicas` ↔ `Size`. Real conversions must
+map all relevant spec and status fields, including a preservation strategy for
+fields absent from another version. Test round trips in both directions for the
+mapped value and metadata (name, namespace, UID, labels, annotations, owner
+references, and finalizers); converted metadata must not alias the source.
+
+[Controller-runtime v0.23.0 allocates the destination](https://github.com/kubernetes-sigs/controller-runtime/blob/v0.23.0/pkg/webhook/conversion/conversion.go)
+before conversion. Preserve `ObjectMeta` and leave the destination `TypeMeta`
+alone: the handler sets the requested API version and kind. Follow the
+[storage migration workflow](./workflow-essentials.md#multi-version-crds) before
+retiring a version.
+
+## Immutable Fields with CEL
+
+Prefer CRD CEL transition rules for schema-expressible constraints on supported
+clusters. [Validation rules are stable in Kubernetes v1.29](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#validation-rules);
+they were [beta and enabled by default in v1.25](https://kubernetes.io/blog/2022/09/23/crd-validation-rules-beta/)
+and [alpha in v1.23](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates-removed/).
+Check the target cluster's feature gate and generator support
+when using earlier releases. Use `ValidateUpdate` for constraints beyond available
+schema/CEL capabilities, such as checks involving another object.
+
+For a required, non-nullable field, combine schema requiredness with a value rule:
+
+```go
+type MemcachedSpec struct {
+    // +kubebuilder:validation:Required
+    // +kubebuilder:validation:MaxLength=253
+    // +kubebuilder:validation:XValidation:rule="self == oldSelf",message="storageClass is immutable"
+    StorageClass string `json:"storageClass"`
+}
+```
+
+For an optional, non-nullable field whose presence and value must be fixed at
+creation, put both rules on the required parent object:
+
+```go
+// +kubebuilder:validation:XValidation:rule="has(self.storageClass) == has(oldSelf.storageClass)",message="storageClass presence is immutable"
+// +kubebuilder:validation:XValidation:rule="!has(self.storageClass) || !has(oldSelf.storageClass) || self.storageClass == oldSelf.storageClass",message="storageClass is immutable"
+type MemcachedSpec struct {
+    // +kubebuilder:validation:Optional
+    // +kubebuilder:validation:MaxLength=253
+    StorageClass *string `json:"storageClass,omitempty"`
+}
+```
+
+In both examples, mark the root object's `Spec MemcachedSpec` field `Required`
+and use `json:"spec"` so updates cannot bypass the rules by removing `spec`.
+The optional example allows creation with or without `storageClass`; updates
+allow absent → absent and equal present values, but reject addition, removal,
+and value changes. Defaults are applied before validation, so a defaulted value
+counts as present. [Field-level transition rules](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#transition-rules)
+run only when both values exist; parent rules catch presence changes. These
+examples need no `optionalOldSelf` support. Validate the generated CRD and these
+transitions against the target API server; generation alone does not prove acceptance.
 
 ## Webhook Configuration
 
@@ -166,4 +225,4 @@ After scaffolding, verify:
 - **Webhook path mismatch**: marker path must match the registration in main.go
 - **sideEffects**: always set `sideEffects=None` unless the webhook truly has side effects
 - **failurePolicy**: use `Fail` in production, `Ignore` only during development
-- **Immutable field validation**: must be done in `ValidateUpdate`, not via markers alone
+- **Immutable field validation**: use CEL where supported; optional fields need explicit presence rules (see above)

@@ -46,6 +46,8 @@ func (r *FooReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch
 ```
 
+Include Secret access only when needed. `get`, `list`, and `watch` can all reveal Secret contents; limit bindings and the manager's cache to the intended namespaces. A controller's Secret permissions do not authorize a user-selected cross-namespace reference: enforce the [reference authorization contract](./go-type-patterns.md#reference-authorization) before reading or using the target.
+
 ### For Events
 
 ```go
@@ -58,8 +60,10 @@ Leader election RBAC is typically handled by the manager, not individual control
 
 ## Namespace-Scoped vs Cluster-Scoped
 
-- Default: markers generate `ClusterRole` (cluster-wide permissions)
-- For namespace-scoped operators, the generated `ClusterRole` is still used but bound via `RoleBinding` to specific namespaces
+- Default: markers generate a `ClusterRole`; its binding determines where the service account receives those permissions.
+- A `ClusterRoleBinding` grants access across namespaces. For namespace-scoped operators, bind the generated `ClusterRole` with a `RoleBinding` in each authorized namespace; a `RoleBinding` does not grant cluster-scoped access.
+
+See [Kubernetes roles and bindings](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#rolebinding-and-clusterrolebinding). Cache scoping limits what the controller watches, but does not replace RBAC or target-owner authorization for cross-namespace references.
 
 ## Regenerate
 

@@ -70,7 +70,11 @@ Replicas *int32 `json:"replicas,omitempty"`
 
 ### Defaults
 
-Defaults must be valid JSON literals. Applied on create only.
+Defaults must be valid JSON literals. [Schema defaulting](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting)
+uses the request version on API requests and the storage version on reads from
+etcd; it also runs after mutating admission patches. A newly added default can
+therefore appear on existing objects without recreation. Read-time defaults are
+not persisted automatically; an API update is needed to write them to etcd.
 
 ```go
 // +kubebuilder:default:=3
@@ -87,7 +91,8 @@ Policy string `json:"policy,omitempty"`
 Config *FooConfig `json:"config,omitempty"`
 ```
 
-Note: CEL rules vary by Kubernetes version; use sparingly.
+For required and optional immutability, version support, and presence rules, see
+[immutable fields with CEL](./webhook-patterns.md#immutable-fields-with-cel).
 
 ## List and Map Semantics
 
@@ -104,11 +109,16 @@ Items []Item `json:"items,omitempty"`
 ### Sets (unique items)
 
 ```go
-// +kubebuilder:validation:UniqueItems=true
 // +kubebuilder:validation:MaxItems=50
 // +listType=set
 Tags []string `json:"tags,omitempty"`
 ```
+
+`+listType=set` generates `x-kubernetes-list-type: set`, which enforces uniqueness
+and gives the list set semantics for SSA. Do not add `UniqueItems=true`:
+[Kubernetes v1.34.0 CRD validation rejects `uniqueItems: true`](https://github.com/kubernetes/kubernetes/blob/v1.34.0/staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation/validation.go).
+Check CRD acceptance and duplicate rejection with API-server validation; successful
+generation alone does not establish either.
 
 ### Map-like lists (keyed by field)
 
@@ -151,7 +161,7 @@ Higher `priority` columns shown only with `-o wide`.
 ## Common Pitfalls
 
 - **Markers not appearing in CRD**: confirm they're on the correct field/type and supported by your `controller-gen` version
-- **Defaults not applied**: must be valid JSON literals; only applied on create
+- **Defaults not applied**: check the relevant version's schema; request/read defaults do not imply a stored value (see above)
 - **Required vs optional confusion**: requiredness is driven by CRD schema (pointer + omitempty), not by `omitempty` alone
 - **List semantics missing**: causes SSA merge conflicts; add `+listType` early
 - **Wrong marker scope**: some markers are field-level, some are type-level, some can be package-level
