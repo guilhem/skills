@@ -1,0 +1,4 @@
+interface:
+  display_name: "README Craft"
+  short_description: "Design useful, detailed, visually coherent READMEs"
+  default_prompt: "Use $readme-craft to improve this README around its readers' needs, a first useful result, trustworthy detail, and the project's visual identity."
