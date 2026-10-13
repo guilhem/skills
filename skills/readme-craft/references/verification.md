@@ -11,6 +11,12 @@ support claims, and limits against the current target revision. Trace optional
 backends and feature flags before describing them as available by default. A
 timestamp or badge is not evidence that the documentation is accurate.
 
+Check that the README emphasizes purpose and usable capabilities. Release metadata
+belongs on its authoritative page; use a link or dynamic badge without copying
+notes, project versions, or release summaries. Do not add editorial maturity
+labels or inferred readiness. Preserve concrete configuration and operational
+constraints.
+
 Follow each relevant reader's path: can they understand the value, choose the
 supported route, complete their first task, recognize success, and find the next
 level of detail? Look for missing prerequisites and for limits disclosed only
@@ -56,6 +62,11 @@ Verify relative files, images, section anchors, and external targets introduced
 or changed by the task. Follow links as a reader would, including links to deeper
 documentation. Keep commands and expected results readable when assets fail.
 Inspect Markdown code fences, tables, and expandable sections for broken rendering.
+
+For Mermaid, check both syntax and whether actors, edges, and boundaries match
+the relevant implementation. For badges, check the source, destination, release
+channel or workflow branch, and what the label actually establishes. Verify that
+each visual improves quick understanding rather than repeating nearby material.
 
 Preview the changed presentation with an available renderer. For visual changes,
 inspect both wide and narrow views, light and dark contrast, clipping, legibility,

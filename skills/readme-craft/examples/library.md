@@ -1,9 +1,9 @@
 # Library example: a small API call with an observable result
 
 > **Fictional example — not working instructions or evidence.** Fictional
-> RowPocket, its paths, packages, commands, results, and any described screenshots
-> are illustrative. Nothing below establishes a real project's behavior,
-> supported environment, maturity, or validation status.
+> RowPocket, its paths, packages, commands, results, URLs, and any described
+> screenshots are illustrative. Nothing below establishes a real project's
+> behavior, supported environment, release, or validation status.
 
 This sample serves application developers who need rows from a small CSV input.
 The API and its boundaries matter more than a product tour. Its compact order is
@@ -17,6 +17,9 @@ one possible response to that need, not a required library README structure.
 Turn a CSV string into records with named fields. RowPocket helps application
 developers import small tabular inputs without writing their own delimiter
 and quoting parser.
+
+[GitHub Releases](https://github.com/fictional-readme-examples/rowpocket/releases)
+contains release notes and version history for checking changes before updating.
 
 ## Parse your first rows
 
@@ -54,7 +57,6 @@ infer dates, numbers, or application-specific meaning.
 | Malformed quoting throws `CsvSyntaxError` | Catch it at the import boundary and show a useful error |
 | Parsing does not validate business fields | Validate required fields before storing records |
 
-The package is experimental; check the release notes before updating callers.
 Use `docs/api.md` for quoting rules, empty fields, and error details. Use
 `docs/imports.md` for validation and import-error handling. Contributors can
 start with the parser fixtures and the checks described in `CONTRIBUTING.md`.
@@ -75,17 +77,22 @@ start with the parser fixtures and the checks described in `CONTRIBUTING.md`.
   contributors get fixtures and checks. Add runtime or plugin-author paths only
   if the actual library has those readers and distinct tasks.
 - **Visual choice:** The short output block is useful proof to aim for. A
-  screenshot of a terminal adds little here. A data-flow diagram becomes useful
-  only if a real integration has stages or boundaries the prose cannot clarify.
-- **Limits and maturity:** Memory behavior, validation ownership, and an
-  experimental API change adoption decisions. The fictional sample does not
-  establish those facts for any existing package.
+  screenshot of a terminal adds little here. The contract table makes caller
+  responsibilities scannable. Add a flow diagram only if an actual integration
+  has stages or boundaries these snippets cannot explain.
+- **Release navigation:** The link goes to GitHub Releases, which owns version
+  history and release notes. Linking instead of copying versions or notes avoids
+  manual synchronization. Verify the destination and the example against the intended
+  package artifact; replace the fictional owner and repository in the URL.
+- **Limits:** Memory behavior and validation ownership affect integration.
+  The fictional sample does not establish those facts for any existing package.
 
 ## Adapting and checking
 
 Read the manifest, public entry points, supported environments, tests, and
 existing examples. Use the project's real package manager and import form.
 Link to API and contribution documents only after verifying their targets.
+No release URL was fetched for this fictional sample.
 
 Run the example in a clean supported consumer project against the intended
 package artifact. Compare its actual output with the README. Testing inside

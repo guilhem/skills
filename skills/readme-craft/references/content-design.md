@@ -7,14 +7,19 @@ readers need answered, rather than by whether a project is open source or intern
 ## Establish value from evidence
 
 Read enough of the repository to separate implemented capabilities, optional
-backends, experimental paths, and planned work. Check the intended installation
-route and examples before choosing a quick start. Existing prose is a lead to
-verify, not proof of current behavior.
+backends, and planned work. Check the intended installation route and examples
+before choosing a quick start. Existing prose is a lead to verify, not proof of
+current behavior.
 
 Connect a concrete reader situation to an outcome. A useful description answers
 what the project enables and for whom; technical mechanisms explain how when
 that helps the reader choose. Replace broad adjectives such as "powerful" or
 "seamless" with a specific capability or demonstrated result.
+
+Express the project's purpose and intended direction when grounded in its design
+or maintained documentation. Give readers a clear picture of what they can do
+with it. Identify future intentions as intentions, so they are not mistaken for
+currently available functionality.
 
 For example, the fictional description "A Rust daemon with D-Bus support" could
 become "Control attached devices from local applications through one D-Bus API."
@@ -70,10 +75,19 @@ Use an architecture or workflow diagram when understanding a boundary or sequenc
 changes how the reader integrates or operates the project. Explain relationships
 in user terms before listing implementation components.
 
-Keep adoption constraints visible: supported platforms, project maturity,
-authentication, privilege requirements, data ownership, and operational limits
-where they affect a decision. Separate actual support from simulated behavior,
+Keep usage constraints visible: supported platforms, authentication, privilege
+requirements, data ownership, and operational limits where they affect a
+decision. Separate actual support from simulated behavior,
 planned features, or a successful build on one machine.
+
+Keep release information on its authoritative page, such as GitHub Releases.
+Use a link or dynamic badge to give access without copying project versions,
+release notes, or summaries that need synchronization. The reader decides how
+to interpret the project's maturity. Do not add a maturity section, label the
+project "prototype" or "experimental", or infer readiness from a version number
+or a passing workflow. Keep concrete usage restrictions where they affect the
+task; they describe behavior rather
+than assigning a general judgment to the project.
 
 Place exhaustive API reference, contributor procedures, or long runbooks in linked
 documentation when that improves the reading path. Existing links must lead to

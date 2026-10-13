@@ -1,9 +1,9 @@
 # Embedded example: host simulation before physical deployment
 
 > **Fictional example — not working instructions or evidence.** Fictional
-> LanternBench, its paths, packages, commands, results, and any described
-> screenshots are illustrative. Nothing below establishes a real project's
-> behavior, supported environment, maturity, or validation status.
+> LanternBench, its paths, packages, commands, results, URLs, badges, diagrams,
+> and any described screenshots are illustrative. Nothing below establishes a
+> real project's behavior, supported environment, release, or validation status.
 
 This sample serves firmware integrators evaluating a door indicator, then
 operators preparing a board. A host simulation gives a first useful result
@@ -18,6 +18,23 @@ it is not a universal embedded-project outline.
 Show whether a storage-room door is open using a door sensor and an indicator.
 LanternBench is for integrators assembling that device and operators maintaining
 it. Evaluate the event logic on your computer before choosing or wiring a board.
+
+[![Host CI: Linux simulation tests](https://github.com/fictional-readme-examples/lanternbench/actions/workflows/host-ci.yml/badge.svg?branch=main)](https://github.com/fictional-readme-examples/lanternbench/actions/workflows/host-ci.yml?query=branch%3Amain)
+
+The badge covers Linux host simulation tests. Physical door and indicator
+behavior requires a separate check on the intended board and wiring.
+
+```mermaid
+flowchart TB
+    subgraph Host["Host simulation"]
+        Events["Synthetic door events"] --> Sim["Event logic"]
+        Sim --> Trace["Indicator trace"]
+    end
+    subgraph Board["Physical device - separate validation"]
+        Sensor["Door sensor"] --> Firmware["Target firmware"]
+        Firmware --> Indicator["Wired indicator"]
+    end
+```
 
 ## Run a door cycle without hardware
 
@@ -54,8 +71,8 @@ The trace demonstrates event handling in the host simulator. It does not test
 sensor wiring, electrical levels, debounce timing, indicator polarity,
 persistent state after power loss, or behavior on the target processor.
 
-This firmware is a prototype. Consult `docs/boards.md` for explicitly listed
-board revisions; a matching connector alone does not establish board support.
+Consult `docs/boards.md` for explicitly listed board revisions; a matching
+connector alone does not establish board support.
 
 ## Before flashing a physical board
 
@@ -89,19 +106,26 @@ Firmware contributors can use `docs/development.md` for builds and host checks.
 - **Physical prerequisites:** Target selection, voltage, erased data, and
   recovery belong before flashing because they change whether proceeding is
   appropriate. No generic flash command is supplied for an unspecified board.
-- **Useful visuals:** A verified board-specific pinout can help prevent wiring
-  mistakes in the bring-up guide. A small event-to-indicator diagram can explain
-  the integration boundary. Use actual mappings, captions, and readable text;
-  this fictional example supplies no asset embed or claimed hardware photo.
-- **Depth and maturity:** Prototype status and explicit audience routes help
-  readers choose their next task without reading internal architecture first.
-  Actual support and maturity statements require maintained project evidence.
+- **Diagram:** Two separate paths show synthetic events producing a trace and
+  a real sensor driving a wired indicator. There is no implied host-to-board
+  test result. Verify the actual backend and signal paths before adaptation.
+- **Host-CI badge:** It identifies the check scope and links to its workflow.
+  Verify the workflow URL, badge endpoint, branch/revision, jobs, and test
+  coverage; the words "host CI" must not mask a build-only check. A passing
+  workflow does not establish physical behavior. Replace the fictional owner,
+  repository, workflow, and branch with the actual endpoints.
+- **Further visuals and depth:** A verified board-specific pinout belongs in
+  the bring-up guide when it helps wiring. Keep audience routes and support
+  details available; no hardware photo or support claim is evidence here.
 
 ## Adapting and checking
 
 Inspect manifests, event fixtures, simulator backends, target definitions,
 bring-up instructions, and recovery behavior. Verify real reference targets.
 Run the documented host command and check its exit status and actual trace.
+Inspect diagram rendering and badge legibility at wide and narrow widths on
+the publishing host. The workflow URL and badge are fictional. Rendering the
+diagram checks its syntax and presentation, not firmware or hardware behavior.
 
 Report evidence separately: source inspection establishes what was inspected;
 a local simulation establishes host behavior; CI reports the jobs and targets

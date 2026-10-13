@@ -1,9 +1,9 @@
 # Application example: a browser task before deployment details
 
 > **Fictional example — not working instructions or evidence.** Fictional
-> ShiftSlate, its paths, packages, commands, results, and any described screenshots
-> are illustrative. Nothing below establishes a real project's behavior,
-> supported environment, maturity, or validation status.
+> ShiftSlate, its paths, packages, commands, results, URLs, badges, diagrams, and
+> any described screenshots are illustrative. Nothing below establishes a real
+> project's behavior, supported environment, release, or validation status.
 
 This sample assumes a browser application for volunteer coordinators. Their
 first need is to assign a shift and see the assignment stick; operators have a
@@ -16,6 +16,18 @@ different task. The order follows those needs, not a universal README outline.
 
 Plan volunteer shifts and see which ones still need a person. ShiftSlate is for
 coordinators who currently reconcile sign-up messages with a separate roster.
+
+[![Latest GitHub release](https://img.shields.io/github/v/release/fictional-readme-examples/shiftslate)](https://github.com/fictional-readme-examples/shiftslate/releases)
+
+Assign a volunteer and reload the roster to see the saved assignment:
+
+```mermaid
+flowchart TB
+    Browser["Browser roster"] -->|Assign volunteer| Service["Roster service"]
+    Service -->|Save assignment| Store["Local demo store"]
+    Store -->|Read saved roster| Service
+    Service -->|Show assignment| Browser
+```
 
 ## Try assigning a shift
 
@@ -53,9 +65,9 @@ An exported CSV is a separate copy. Changing it does not update the roster.
 
 ## Before using this for a real event
 
-This release is a preview. The demo does not configure event membership or
-production access controls. An operator must complete the setup in
-`docs/operations.md` before inviting real volunteers.
+The demo does not configure event membership or production access controls.
+An operator must complete the setup in `docs/operations.md` before inviting
+real volunteers.
 
 Coordinators can use `docs/coordinator-guide.md` for roster changes and exports.
 Operators can use `docs/operations.md` for configuration, backups, restoration,
@@ -70,16 +82,23 @@ change the application.
 - **First success:** Installation is only preparation. Named browser controls,
   refresh, and a persistent assignment make success recognizable. For a real
   hosted product, its supported sign-in path may replace this local demo.
-- **Useful visual:** Put a real screenshot after the assignment steps if it
-  helps readers locate the shift and recognize its saved state. Capture the
-  current UI using demo data, crop to the relevant controls, and explain the
-  state in a caption. No screenshot or asset embed is supplied here.
+- **Diagram:** The save/read loop explains where an assignment goes and why
+  refreshing is part of the task. Verify the service and storage boundaries
+  against the actual demo; the diagram describes a flow, not a successful run.
+- **Dynamic release badge:** It reads the version from GitHub Releases and
+  links to that authoritative page. This avoids manually copying versions,
+  release notes, or summaries into the README. Verify the repository, badge
+  source, release filtering, and destination; replace the fictional owner and
+  repository. Readers get release history without a second copy to maintain.
+- **Screenshot:** Put a real capture after the assignment steps to help readers
+  locate the shift and recognize its saved state. Capture the current UI using
+  demo data, crop to the relevant controls, and explain the state in a caption.
+  No screenshot image is supplied here.
 - **Useful depth:** The task table offers next actions. The separate operator
   route keeps configuration details available without making coordinators read
   deployment internals. Real deeper documents should become verified links.
-- **Limits:** Preview status, demo data, export behavior, and retained local
-  state affect reader decisions. Each would need support in the actual project;
-  the sample's labels are fictional, not conclusions about this repository.
+- **Limits:** Demo data, access setup, export behavior, and retained local
+  state affect reader actions. Each needs support in the actual project.
 
 ## Adapting and checking
 
@@ -87,11 +106,15 @@ Inspect scripts, demo fixtures, UI labels, persistence behavior, and existing
 operator documentation before borrowing any wording. Confirm that the full
 start-to-refresh path works in the stated environment. Replace the sample
 requirements, address, paths, and output with what the project actually provides.
+Check diagram labels and badge legibility on the publishing host at wide and
+narrow widths. URLs use the fictional `fictional-readme-examples` owner and do
+not establish a real release. Rendering checks diagram syntax and presentation;
+it does not validate the application's behavior.
 
 Keep evidence distinct: source inspection can establish a script's intent;
 a local browser run can demonstrate this task; CI results only establish the
-checks that CI ran. A screenshot shows one captured state, not persistence,
-deployment readiness, or access-control correctness.
+checks that CI ran. A screenshot shows one captured state, not persistence or
+access-control correctness. Neither a release badge nor CI replaces that evidence.
 
 For a focused correction, change the affected instructions and proof only.
 For review-only work, report gaps without editing the README or running actions

@@ -1,14 +1,15 @@
 ---
 name: readme-craft
-description: "Create, improve, or review project READMEs around reader needs, a first useful result, trustworthy detail, and a project-specific visual identity. Use for README content and presentation; keep targeted edits proportional and review-only requests read-only."
+description: "Create, improve, or review project READMEs around purpose, useful capabilities, a first result, and an expressive visual identity with meaningful diagrams and badges. Use for README content and presentation; keep targeted edits proportional and review-only requests read-only."
 ---
 
 # README Craft
 
 Make the repository's front page help its readers decide whether the project fits
 their need, achieve a first useful result, and find the depth needed to adopt it.
-Combine clear writing, real proof, and useful visual design. Adapt the reading
-order to the project rather than filling a universal template.
+Explain what readers can do and why the project exists through clear writing,
+real proof, and a graphical reading path. Adapt the reading order to the project
+rather than filling a universal template.
 
 This skill is self-contained. Use available repository tooling for checks and
 previews; another writing skill, image generator, plugin, or installed renderer
@@ -33,16 +34,17 @@ Before composing a substantial rewrite, establish:
 - The reader's situation, the problem, and the outcome the project enables.
 - The strongest available proof: an example, real output, screenshot, or diagram.
 - The shortest supported route to a first useful result and recognizable success.
-- Requirements, maturity, limitations, or operational effects that affect adoption.
+- Requirements, concrete usage constraints, or operational effects that affect use.
 
 Use these answers to choose what earns space. A list of technologies is supporting
 context; explain capabilities through what readers can accomplish with them.
 
 ## Compose the reading path
 
-Make the opening explain what the project does, who it serves, and why it is useful
-in plain language. Put convincing proof close to that explanation. A screenshot
-is useful for an interface; an input/output example may serve a library better.
+Make the opening explain the project's purpose, who it serves, and what readers
+can accomplish in plain language. Put convincing proof close to that explanation.
+A screenshot is useful for an interface; an input/output example may serve a
+library better.
 Keep essential meaning in text even when images fail.
 
 Give the reader prerequisites, a complete supported example, and the expected
@@ -50,6 +52,11 @@ outcome before implementation detail. Explain enough configuration, integrations
 failure recovery, and limits to complete the real task. Keep decision-critical
 information beside the affected step. Offer distinct paths for other audiences
 when their tasks differ; link to deeper documentation from the relevant context.
+
+Let readers assess maturity themselves. GitHub Releases owns release information;
+give access through a link or dynamic badge instead of copying version numbers,
+release notes, summaries, or release-stage commentary into the README. Do not
+add maturity verdicts or generic readiness warnings.
 
 For a substantial rewrite or questions about depth and audience paths, read
 [content design](references/content-design.md). Retain useful existing detail;
@@ -68,12 +75,15 @@ outlines. Derive every published command, claim, and asset from the actual proje
 
 ## Design the presentation
 
-Use descriptive headings, short connected paragraphs, and tables or diagrams where
-comparison or relationships become clearer. Make the page easy to scan while
-retaining the detail needed for use. Badge collections, repeated promises, and
-generic banners do not establish value.
+For creation or a substantial refresh, actively design a graphical reading path.
+Use Mermaid to explain a useful workflow or architecture, badges for relevant
+release versions and checks, and screenshots or output to show capabilities
+when they help readers understand the project quickly. Select visuals by the
+information they convey; do not add them just to fill a template.
 
-When visual work is in scope, read [visual design](references/visual-design.md).
+Use descriptive headings, short connected paragraphs, and tables for comparisons.
+Keep the page easy to scan while retaining the detail needed for use. For creation,
+a substantial refresh, or scoped visual work, read [visual design](references/visual-design.md).
 Choose a coherent direction from the project's own interface, artifacts, domain,
 or existing identity. Each visual should demonstrate, explain, compare, or orient.
 Prefer real screenshots and outputs; label mockups and illustrative diagrams.
