@@ -67,6 +67,10 @@ Inspect `config/crd/bases/<group>_<plural>.yaml` and confirm:
 - Status subresource exists when needed
 - Printer columns render correctly
 
+Generation is not API-server validation. Check CRD acceptance and representative
+create/update cases using envtest or a disposable cluster at the target Kubernetes
+version, especially for CEL and list semantics.
+
 ## Run Locally
 
 ```bash
@@ -96,7 +100,7 @@ make deploy IMG=<registry>/<image>:<tag>
 ## Common Pitfalls
 
 - **"Required" vs "optional" in Go**: optional scalars should be pointers; `omitempty` affects JSON output but requiredness is driven by CRD schema
-- **Defaults not showing**: must be valid JSON literals in markers; only applied on create
+- **Defaults not showing**: schema defaults apply on requests and reads; existing objects can expose new defaults before an API update persists them (see [defaulting semantics](./kubebuilder-markers.md#defaults))
 - **Lists missing SSA semantics**: define `listType=set|map` and `listMapKey` early
 - **References**: prefer API-owned reference structs over generic Kubernetes types
 - **Subresources are opt-in**: `/status` needs `+kubebuilder:subresource:status`
@@ -113,6 +117,23 @@ make deploy IMG=<registry>/<image>:<tag>
 If designing multi-version API (`v1alpha1` → `v1beta1` → `v1`):
 
 - Follow [multiversion tutorial](https://book.kubebuilder.io/multiversion-tutorial/tutorial.html)
-- Conversion webhooks needed between versions
+- Identical schemas can use `spec.conversion.strategy: None`; use a conversion
+  webhook when fields need transformation (see [conversion patterns](./webhook-patterns.md#conversion-webhooks-multi-version))
 - Mark storage version with `+kubebuilder:storageversion`
 - Keep hub version stable; spoke versions convert to/from hub
+
+When changing the storage version, follow the
+[Kubernetes storage migration procedure](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#upgrade-existing-objects-to-a-new-stored-version):
+
+1. Add the new served version, deploy any required conversion webhook, and select
+   exactly one storage version. Retain the old version and its conversions.
+2. Migrate every existing object, across all namespaces, to the new storage
+   version using a supported storage migrator or a list-and-rewrite procedure
+   that preserves content and handles concurrent updates. Switching `storage`
+   does not rewrite existing objects; new writes use the selected version.
+3. Verify migration completed successfully before removing the old version from
+   CRD `status.storedVersions` via the status subresource. Keep the current storage
+   version in that list; editing the list is bookkeeping, not data migration.
+4. Migrate clients, set the old version `served: false`, then remove it from
+   `spec.versions` once it is absent from `status.storedVersions`. Remove obsolete
+   conversion code only when no remaining served or stored version needs it.
