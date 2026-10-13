@@ -25,6 +25,7 @@ import (
 type FooReconciler struct {
     client.Client
     Scheme *runtime.Scheme
+    APIReader client.Reader
 }
 ```
 
@@ -32,7 +33,11 @@ type FooReconciler struct {
 
 > For most CRs, prefer the [Typed Reconciler](#typed-reconciler-reconcileobjectreconciler) below. Use this classic pattern when you need custom fetch logic (unstructured objects, multi-resource lookups, conditional Get).
 
-Follow this pattern: fetch → check deletion → reconcile → update status.
+Follow this pattern: fetch → check deletion → persist a finalizer if cleanup is required → reconcile → observe readiness and update status.
+The examples below include the finalizer calls for controllers with external cleanup
+obligations. Omit those calls for controllers whose owned Kubernetes resources are
+fully handled by garbage collection. `updateStatus` is defined in
+[status and conditions](./status-and-conditions.md#status-update-pattern-in-controller).
 
 ```go
 func (r *FooReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -49,12 +54,16 @@ func (r *FooReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
         return r.handleDeletion(ctx, &foo)
     }
 
+    // Only for effects requiring cleanup: a failed write must stop this attempt.
+    if err := r.ensureFinalizer(ctx, &foo); err != nil {
+        return ctrl.Result{}, err
+    }
+
     // 3. Reconcile desired state
     result, err := r.reconcile(ctx, &foo)
 
     // 4. Always update status (even on error)
-    foo.Status.ObservedGeneration = foo.Generation
-    if statusErr := r.Status().Update(ctx, &foo); statusErr != nil {
+    if statusErr := r.updateStatus(ctx, &foo, err); statusErr != nil {
         logger.Error(statusErr, "Failed to update status")
         return ctrl.Result{}, statusErr
     }
@@ -71,6 +80,7 @@ Since controller-runtime v0.17+, prefer `reconcile.ObjectReconciler[T]` to elimi
 type FooReconciler struct {
     client.Client
     Scheme *runtime.Scheme
+    APIReader client.Reader
 }
 
 // Reconcile receives the deserialized object directly — no need to call Get() or handle NotFound.
@@ -82,10 +92,14 @@ func (r *FooReconciler) Reconcile(ctx context.Context, foo *cachev1.Foo) (ctrl.R
         return r.handleDeletion(ctx, foo)
     }
 
+    // Only for effects requiring cleanup: a failed write must stop this attempt.
+    if err := r.ensureFinalizer(ctx, foo); err != nil {
+        return ctrl.Result{}, err
+    }
+
     result, err := r.reconcile(ctx, foo)
 
-    foo.Status.ObservedGeneration = foo.Generation
-    if statusErr := r.Status().Update(ctx, foo); statusErr != nil {
+    if statusErr := r.updateStatus(ctx, foo, err); statusErr != nil {
         logger.Error(statusErr, "Failed to update status")
         return ctrl.Result{}, statusErr
     }
@@ -98,6 +112,7 @@ Wire it up with `reconcile.AsReconciler`:
 
 ```go
 func (r *FooReconciler) SetupWithManager(mgr ctrl.Manager) error {
+    r.APIReader = mgr.GetAPIReader()
     return ctrl.NewControllerManagedBy(mgr).
         For(&cachev1.Foo{}).
         Owns(&appsv1.Deployment{}).
@@ -117,6 +132,7 @@ Configure watches: `For()` the CR, `Owns()` managed resources.
 
 ```go
 func (r *FooReconciler) SetupWithManager(mgr ctrl.Manager) error {
+    r.APIReader = mgr.GetAPIReader()
     return ctrl.NewControllerManagedBy(mgr).
         For(&cachev1.Foo{}).
         Owns(&appsv1.Deployment{}).
@@ -149,24 +165,33 @@ Benefits:
 |--------|--------|
 | `ctrl.Result{}, nil` | Success, stop reconciliation |
 | `ctrl.Result{}, err` | Error, requeue with backoff |
-| `ctrl.Result{Requeue: true}, nil` | Requeue immediately (no error) |
+| `ctrl.Result{Requeue: true}, nil` | Rate-limited requeue; deprecated in v0.23, prefer `RequeueAfter` |
 | `ctrl.Result{RequeueAfter: 30*time.Second}, nil` | Requeue after delay |
 
 ## Finalizer Pattern
 
-Use finalizers when cleanup is needed before deletion:
+Use finalizers only when deletion needs controller-managed cleanup, such as removing
+an external resource. Owned Kubernetes children usually need owner references instead.
+Persist the finalizer before creating any effect that depends on this cleanup.
+If `Update` fails (including a resource-version conflict), return without creating
+that effect. The next attempt must fetch again and check deletion first; Kubernetes
+rejects adding a new finalizer once deletion has started. If deletion starts after a
+successful write, the persisted finalizer holds the object for cleanup.
+
+See [Kubernetes finalizer rules](https://kubernetes.io/docs/concepts/overview/working-with-objects/finalizers/)
+and the [Kubebuilder finalizer example](https://book.kubebuilder.io/reference/using-finalizers.html).
 
 ```go
 const finalizerName = "cache.example.com/finalizer"
 
 func (r *FooReconciler) handleDeletion(ctx context.Context, foo *cachev1.Foo) (ctrl.Result, error) {
     if controllerutil.ContainsFinalizer(foo, finalizerName) {
-        // Run cleanup logic
+        // Idempotent cleanup: retries must tolerate already-removed resources.
         if err := r.cleanupResources(ctx, foo); err != nil {
             return ctrl.Result{}, err
         }
 
-        // Remove finalizer
+        // Remove only after cleanup completes; a failed Update retries cleanup.
         controllerutil.RemoveFinalizer(foo, finalizerName)
         if err := r.Update(ctx, foo); err != nil {
             return ctrl.Result{}, err
@@ -178,7 +203,7 @@ func (r *FooReconciler) handleDeletion(ctx context.Context, foo *cachev1.Foo) (c
 func (r *FooReconciler) ensureFinalizer(ctx context.Context, foo *cachev1.Foo) error {
     if !controllerutil.ContainsFinalizer(foo, finalizerName) {
         controllerutil.AddFinalizer(foo, finalizerName)
-        return r.Update(ctx, foo)
+        return r.Update(ctx, foo) // Resource version fences concurrent deletion/writes.
     }
     return nil
 }
@@ -334,9 +359,10 @@ if err := r.Patch(ctx, dep, client.Apply, client.FieldOwner(fieldManager), clien
 ## Error Handling Best Practices
 
 - Use `client.IgnoreNotFound(err)` for Get operations (resource may be deleted)
-- Always update status even when reconciliation fails
-- Use `Requeue: true` for transient conditions (waiting for dependency)
-- Use `RequeueAfter` for polling patterns
+- Attempt status updates after business reconciliation, including failures; skip writes when unchanged
+- Watch dependencies or use `RequeueAfter` while waiting for them
+- Use `RequeueAfter` for polling patterns, including periodic checks of healthy objects
+- Derive `Ready` from observed dependencies, never from a nil error or the requeue delay
 - Log errors with structured fields: `logger.Error(err, "msg", "key", value)`
 
 ## Event Recording for Observability
@@ -351,13 +377,17 @@ Add `record.EventRecorder` to the reconciler struct and register it in `SetupWit
 type FooReconciler struct {
     client.Client
     Scheme   *runtime.Scheme
+    APIReader client.Reader
     Recorder record.EventRecorder
 }
 
 func (r *FooReconciler) SetupWithManager(mgr ctrl.Manager) error {
+    r.APIReader = mgr.GetAPIReader()
     r.Recorder = mgr.GetEventRecorderFor("foo-controller")
     return ctrl.NewControllerManagedBy(mgr).
         For(&cachev1.Foo{}).
+        Owns(&appsv1.Deployment{}).
+        Owns(&corev1.Service{}).
         Complete(r)
 }
 ```

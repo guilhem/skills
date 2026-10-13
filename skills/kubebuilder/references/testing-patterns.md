@@ -65,6 +65,7 @@ var _ = BeforeSuite(func() {
     err = (&FooReconciler{
         Client: mgr.GetClient(),
         Scheme: mgr.GetScheme(),
+        APIReader: mgr.GetAPIReader(),
     }).SetupWithManager(mgr)
     Expect(err).NotTo(HaveOccurred())
 
@@ -84,6 +85,14 @@ var _ = AfterSuite(func() {
 
 ## Controller Test Pattern
 
+Envtest runs an API server and etcd, but no built-in Deployment controller or
+kubelet. Assert resource creation separately from readiness. The test below
+simulates Deployment status to exercise the
+[Ready contract](./status-and-conditions.md#status-update-pattern-in-controller);
+it proves the Foo controller reacts to those observations, not that Pods actually
+became available. Use a real cluster test for workload rollout and availability.
+See the [envtest limitations](https://book.kubebuilder.io/reference/envtest.html#testing-considerations).
+
 ```go
 var _ = Describe("Foo Controller", func() {
     const (
@@ -92,14 +101,14 @@ var _ = Describe("Foo Controller", func() {
     )
 
     Context("When creating a Foo resource", func() {
-        It("Should create a Deployment", func() {
+        It("Should report readiness from observed Deployment status", func() {
             foo := &cachev1.Foo{
                 ObjectMeta: metav1.ObjectMeta{
                     Name:      "test-foo",
                     Namespace: "default",
                 },
                 Spec: cachev1.FooSpec{
-                    Size: ptr.To(int32(3)),
+                    Replicas: ptr.To(int32(3)),
                 },
             }
 
@@ -116,19 +125,53 @@ var _ = Describe("Foo Controller", func() {
 
             Expect(*createdDep.Spec.Replicas).To(Equal(int32(3)))
 
-            // Verify status is updated
+            // A Deployment with no available replicas must not make Foo Ready.
             updatedFoo := &cachev1.Foo{}
+            fooKey := types.NamespacedName{Name: "test-foo", Namespace: "default"}
             Eventually(func() bool {
-                err := k8sClient.Get(ctx, types.NamespacedName{Name: "test-foo", Namespace: "default"}, updatedFoo)
-                if err != nil {
+                if err := k8sClient.Get(ctx, fooKey, updatedFoo); err != nil {
                     return false
                 }
-                return meta.IsStatusConditionTrue(updatedFoo.Status.Conditions, "Ready")
+                condition := meta.FindStatusCondition(updatedFoo.Status.Conditions, "Ready")
+                return condition != nil && condition.Status == metav1.ConditionFalse &&
+                    condition.ObservedGeneration == updatedFoo.Generation
+            }, timeout, interval).Should(BeTrue())
+
+            // Simulate the Deployment controller; GET again to handle write conflicts.
+            Eventually(func() error {
+                if err := k8sClient.Get(ctx, depKey, createdDep); err != nil {
+                    return err
+                }
+                createdDep.Status.ObservedGeneration = createdDep.Generation
+                createdDep.Status.Replicas = *createdDep.Spec.Replicas
+                createdDep.Status.UpdatedReplicas = *createdDep.Spec.Replicas
+                createdDep.Status.ReadyReplicas = *createdDep.Spec.Replicas
+                createdDep.Status.AvailableReplicas = *createdDep.Spec.Replicas
+                return k8sClient.Status().Update(ctx, createdDep)
+            }, timeout, interval).Should(Succeed())
+
+            Eventually(func() bool {
+                if err := k8sClient.Get(ctx, fooKey, updatedFoo); err != nil {
+                    return false
+                }
+                condition := meta.FindStatusCondition(updatedFoo.Status.Conditions, "Ready")
+                return condition != nil && condition.Status == metav1.ConditionTrue &&
+                    condition.ObservedGeneration == updatedFoo.Generation
             }, timeout, interval).Should(BeTrue())
         })
     })
 })
 ```
+
+Also test loss of availability (`Ready` returns to False), a stale Deployment
+`observedGeneration`, and a healthy periodic `RequeueAfter` that keeps `Ready=True`.
+For finalizers, inject a failed/conflicting persistence write and assert no external
+creation occurred; refetch a deleting object on retry and assert cleanup runs only
+when the finalizer was persisted. Successful persistence followed by deletion must
+retain the finalizer until idempotent cleanup succeeds. Test finalizer-removal
+conflicts by repeating cleanup safely. These scenarios apply only to controllers
+with actual cleanup obligations. Envtest can exercise API conflicts and deletion;
+external effects still need a controlled fake or a separate integration test.
 
 ## Testing Webhooks
 

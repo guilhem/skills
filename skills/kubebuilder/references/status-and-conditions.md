@@ -77,11 +77,12 @@ Since `k8s.io/apimachinery` v0.29+, `meta.SetStatusCondition` returns a `bool`:
 ```go
 import "k8s.io/apimachinery/pkg/api/meta"
 
+// Set True only after observing the readiness contract below.
 changed := meta.SetStatusCondition(&foo.Status.Conditions, metav1.Condition{
     Type:               "Ready",
     Status:             metav1.ConditionTrue,
-    Reason:             "ReconcileSuccess",
-    Message:            "All resources are ready",
+    Reason:             "DeploymentAvailable",
+    Message:            "Deployment rollout is complete",
     ObservedGeneration: foo.Generation,
 })
 // changed == true  → condition was added or modified, status update needed
@@ -115,6 +116,22 @@ preventing the controller from requeueing on failure.
 
 ### Recommended: inline status update at end of Reconcile
 
+These examples assume one writer owns Foo status. Here `Ready=True` means the
+required Service was ensured successfully and the managed Deployment's current
+rollout is complete: its controller has observed the latest generation, all desired
+replicas are updated and available, and no old replicas remain. A missing or deleting
+Deployment is not ready. Zero replicas count as a completed scale-to-zero operation;
+choose a different contract if the API requires a running workload. Additional
+required dependencies must contribute their own observed readiness checks.
+
+This follows the [Kubernetes v1.35.0 rollout-completion checks](https://github.com/kubernetes/kubernetes/blob/v1.35.0/pkg/controller/deployment/util/deployment_util.go#L687-L694).
+`reconcile` must ensure the desired Deployment and Service before returning success.
+Use `APIReader: mgr.GetAPIReader()` on the reconciler for this observation: a cached
+read immediately after a write can still show the previous, healthy Deployment spec.
+A nil error alone does not prove readiness. A delayed requeue can mean either waiting
+for readiness or periodically checking an already healthy object; see the
+[controller-runtime v0.23.0 Result contract](https://github.com/kubernetes-sigs/controller-runtime/blob/v0.23.0/pkg/reconcile/reconcile.go).
+
 ```go
 func (r *FooReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
     logger := log.FromContext(ctx)
@@ -123,37 +140,73 @@ func (r *FooReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
     if err := r.Get(ctx, req.NamespacedName, &foo); err != nil {
         return ctrl.Result{}, client.IgnoreNotFound(err)
     }
-
-    // --- reconciliation logic ---
-    result, reconcileErr := r.reconcile(ctx, &foo)
-
-    // Set condition and update status inline — only write if something changed
-    foo.Status.ObservedGeneration = foo.Generation
-    condition := metav1.Condition{
-      Type: "Ready",
-      ObservedGeneration: foo.Generation
+    if !foo.DeletionTimestamp.IsZero() {
+        return r.handleDeletion(ctx, &foo)
+    }
+    // Include only when effects need controller-managed cleanup.
+    if err := r.ensureFinalizer(ctx, &foo); err != nil {
+        return ctrl.Result{}, err
     }
 
+    result, reconcileErr := r.reconcile(ctx, &foo)
+    if err := r.updateStatus(ctx, &foo, reconcileErr); err != nil {
+        logger.Error(err, "Failed to update status")
+        return ctrl.Result{}, err
+    }
+    return result, reconcileErr
+}
+
+func deploymentReady(dep *appsv1.Deployment) bool {
+    if !dep.DeletionTimestamp.IsZero() {
+        return false
+    }
+    desired := int32(1) // Deployment API default when replicas is omitted.
+    if dep.Spec.Replicas != nil {
+        desired = *dep.Spec.Replicas
+    }
+    return dep.Status.ObservedGeneration >= dep.Generation &&
+        dep.Status.UpdatedReplicas == desired &&
+        dep.Status.Replicas == desired &&
+        dep.Status.AvailableReplicas == desired
+}
+
+func (r *FooReconciler) updateStatus(ctx context.Context, foo *cachev1.Foo, reconcileErr error) error {
+    condition := metav1.Condition{
+        Type: "Ready", Status: metav1.ConditionFalse,
+        Reason: "DependencyNotReady", Message: "Waiting for Deployment rollout",
+        ObservedGeneration: foo.Generation,
+    }
     if reconcileErr != nil {
-        condition.Status = metav1.ConditionFalse
         condition.Reason = "ReconcileError"
         condition.Message = reconcileErr.Error()
     } else {
-        condition.Status = metav1.ConditionTrue
-        condition.Reason = "ReconcileSuccess"
-        condition.Message = "All resources are ready"
-    }
-
-    if meta.SetStatusCondition(&foo.Status.Conditions, condition) {
-        if err := r.Status().Update(ctx, &foo); err != nil {
-            logger.Error(err, "Failed to update status")
-            return ctrl.Result{}, err
+        var dep appsv1.Deployment
+        if err := r.APIReader.Get(ctx, client.ObjectKeyFromObject(foo), &dep); err != nil {
+            if !apierrors.IsNotFound(err) {
+                return err
+            }
+        } else if deploymentReady(&dep) {
+            condition.Status = metav1.ConditionTrue
+            condition.Reason = "DeploymentAvailable"
+            condition.Message = "Deployment rollout is complete"
         }
     }
 
-    return result, reconcileErr
+    generationChanged := foo.Status.ObservedGeneration != foo.Generation
+    foo.Status.ObservedGeneration = foo.Generation
+    conditionChanged := meta.SetStatusCondition(&foo.Status.Conditions, condition)
+    if generationChanged || conditionChanged {
+        return r.Status().Update(ctx, foo)
+    }
+    return nil
 }
 ```
+
+`Owns(&appsv1.Deployment{})` must watch status changes; avoid predicates that discard
+those events. If a dependency has no watch, return a suitable `RequeueAfter` while
+waiting. The helper does not inspect the result delay, so a healthy periodic requeue
+keeps `Ready=True`. To report successful reconciliation independently of availability,
+use a separate condition such as `Reconciled`.
 
 ### Why NOT defer
 
@@ -170,105 +223,124 @@ func (r *FooReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 |---------|----------|
 | Unnecessary API calls | `SetStatusCondition` returns `false` when nothing changed → skip `Update()` |
 | Status update failure | Error returned explicitly → triggers requeue with backoff |
-| No tracking variable | Single `if SetStatusCondition(...) { Update() }` — no `statusChanged` bool to maintain |
+| Other status fields | Track their changes too; a condition no-op must not suppress an `observedGeneration` update |
 | Multiple conditions | Call `SetStatusCondition` for each condition in a separate statement, then combine the returned booleans with logical OR |
 
 ### Multiple conditions: update after each action
 
-Update status immediately after each reconciliation step rather than batching at
-the end. This gives real-time observability via `kubectl get` and preserves
-progress if the controller crashes mid-reconcile.
+When intermediate progress matters, persist a condition after a completed step.
+Creation or a successful apply means the desired resource was ensured, not that
+its workload is available. This `reconcile` plugs into the entrypoints above;
+`updateStatus` computes `Ready` after these steps from the observed Deployment.
 
 ```go
-func (r *FooReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-    logger := log.FromContext(ctx)
-
-    var foo cachev1.Foo
-    if err := r.Get(ctx, req.NamespacedName, &foo); err != nil {
-        return ctrl.Result{}, client.IgnoreNotFound(err)
-    }
-    foo.Status.ObservedGeneration = foo.Generation
-
-    // Step 1: ensure Deployment
-    if err := r.ensureDeployment(ctx, &foo); err != nil {
-        if meta.SetStatusCondition(&foo.Status.Conditions, metav1.Condition{
-            Type: "Ready", Status: metav1.ConditionFalse,
-            Reason: "DeploymentFailed", Message: err.Error(),
-            ObservedGeneration: foo.Generation,
-        }) {
-            _ = r.Status().Update(ctx, &foo) // best-effort before returning error
-        }
+func (r *FooReconciler) reconcile(ctx context.Context, foo *cachev1.Foo) (ctrl.Result, error) {
+    if err := r.ensureDeployment(ctx, foo); err != nil {
         return ctrl.Result{}, err
     }
     if meta.SetStatusCondition(&foo.Status.Conditions, metav1.Condition{
-        Type: "Progressing", Status: metav1.ConditionTrue,
-        Reason: "DeploymentReady", Message: "Deployment is up",
+        Type: "DeploymentEnsured", Status: metav1.ConditionTrue,
+        Reason: "DeploymentEnsured", Message: "Deployment spec applied; ensuring Service",
         ObservedGeneration: foo.Generation,
     }) {
-        if err := r.Status().Update(ctx, &foo); err != nil {
+        if err := r.Status().Update(ctx, foo); err != nil {
             return ctrl.Result{}, err
         }
     }
 
-    // Step 2: ensure Service
-    if err := r.ensureService(ctx, &foo); err != nil {
-        if meta.SetStatusCondition(&foo.Status.Conditions, metav1.Condition{
-            Type: "Ready", Status: metav1.ConditionFalse,
-            Reason: "ServiceFailed", Message: err.Error(),
-            ObservedGeneration: foo.Generation,
-        }) {
-            _ = r.Status().Update(ctx, &foo)
-        }
+    if err := r.ensureService(ctx, foo); err != nil {
         return ctrl.Result{}, err
     }
-
-    // Final: all steps done
     if meta.SetStatusCondition(&foo.Status.Conditions, metav1.Condition{
-        Type: "Ready", Status: metav1.ConditionTrue,
-        Reason: "ReconcileSuccess", Message: "All resources are ready",
+        Type: "ResourcesEnsured", Status: metav1.ConditionTrue,
+        Reason: "ResourcesEnsured", Message: "Resource specs applied; observing readiness",
         ObservedGeneration: foo.Generation,
     }) {
-        if err := r.Status().Update(ctx, &foo); err != nil {
+        if err := r.Status().Update(ctx, foo); err != nil {
             return ctrl.Result{}, err
         }
     }
-
     return ctrl.Result{}, nil
 }
 ```
 
-| Tradeoff | Batch at end | Update after each step |
-|----------|-------------|----------------------|
-| API calls | 1 | N (one per step) |
-| Observability | All-or-nothing | Real-time progress |
-| Crash resilience | Status stale if crash mid-reconcile | Status reflects last completed step |
-| Debugging | Hard to tell where it's stuck | `kubectl get` shows exactly which step |
+Batch at the end for fewer API calls; write intermediate progress only when readers
+need it. Even with intermediate writes, derive `Ready` from observed state.
 
-**Prefer update-after-each-step** for operators with multiple phases. The extra
-API calls are negligible compared to the value of knowing where reconciliation
-is at any moment.
+### Alternative: MergeFrom patch with explicit ownership
 
-### Alternative: MergeFrom patch (lowest conflict risk)
+`MergeFrom` is JSON Merge Patch: it replaces changed arrays in full, including
+`status.conditions`. The `listType=map` / `listMapKey=type` markers do not change
+this behavior. It is not protection against concurrent condition writers; CRDs
+also do not support strategic merge patch. See
+[controller-runtime v0.23.0 patch implementation](https://github.com/kubernetes-sigs/controller-runtime/blob/v0.23.0/pkg/client/patch.go).
 
-When multiple controllers or webhooks may touch status concurrently, use a merge
-patch instead of a full update:
+For a **single status writer**, copy the baseline before changing any status field:
 
 ```go
-if statusChanged {
-    basePatch := client.MergeFrom(foo.DeepCopy())
-    if err := r.Status().Patch(ctx, &foo, basePatch); err != nil {
-        logger.Error(err, "Failed to patch status")
+base := foo.DeepCopy()
+foo.Status.ObservedGeneration = foo.Generation
+changed := meta.SetStatusCondition(&foo.Status.Conditions, condition)
+if changed || base.Status.ObservedGeneration != foo.Status.ObservedGeneration {
+    if err := r.Status().Patch(ctx, foo, client.MergeFrom(base)); err != nil {
         return ctrl.Result{}, err
     }
 }
 ```
+
+For **multiple writers**, assign each condition type to one owner. All writers must
+use concurrency control: read a fresh object, merge only their own conditions into
+its current list, and retry conflicts with another read. This example uses an
+uncached `reader` (`mgr.GetAPIReader()`) and an optimistic resource-version lock.
+The desired condition comes from observations of `observedFoo`; stop and requeue
+for fresh reconciliation if its UID or spec generation has changed.
+
+```go
+func patchReady(ctx context.Context, c client.Client, reader client.Reader, observedFoo *cachev1.Foo, condition metav1.Condition) error {
+    return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+        var current cachev1.Foo
+        if err := reader.Get(ctx, client.ObjectKeyFromObject(observedFoo), &current); err != nil {
+            return err
+        }
+        if current.UID != observedFoo.UID || current.Generation != observedFoo.Generation ||
+            !current.DeletionTimestamp.IsZero() {
+            return fmt.Errorf("Foo changed since readiness was observed; reconcile again")
+        }
+        base := current.DeepCopy()
+        // This writer owns Ready only; preserve every other condition and status field.
+        if !meta.SetStatusCondition(&current.Status.Conditions, condition) {
+            return nil
+        }
+        patch := client.MergeFromWithOptions(base, client.MergeFromWithOptimisticLock{})
+        return c.Status().Patch(ctx, &current, patch)
+    })
+}
+```
+
+Return `patchReady` errors from reconciliation so exhausted retries or changed
+observations trigger another attempt. Do not retry the same stale array. With two
+writers starting from `[Ready=False, BackupReady=False]`, a competing BackupReady
+update makes the Ready patch conflict; the next read includes `BackupReady=True`,
+so the retried list preserves both updates. Never replace the fresh status with the
+old snapshot or let both writers own the same condition type. Assign a separate
+owner for top-level `observedGeneration` if using it with multiple writers.
+
+[client-go v0.35.0 RetryOnConflict](https://github.com/kubernetes/client-go/blob/v0.35.0/util/retry/util.go)
+requires a reread on every attempt. Alternatively, use status SSA with distinct
+field managers, the condition map markers above, and only each manager's own
+condition entries. Avoid forcing ownership of another writer's fields.
 
 ### Required imports
 
 ```go
 import (
+    "fmt"
+
+    appsv1 "k8s.io/api/apps/v1"
+    apierrors "k8s.io/apimachinery/pkg/api/errors"
     "k8s.io/apimachinery/pkg/api/meta"
     metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+    "k8s.io/client-go/util/retry"
     "sigs.k8s.io/controller-runtime/pkg/client"
     "sigs.k8s.io/controller-runtime/pkg/log"
 )
