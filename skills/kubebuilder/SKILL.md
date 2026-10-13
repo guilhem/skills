@@ -36,7 +36,7 @@ Determine before writing any code:
 2. **Spec fields**: required vs optional, immutability expectations
 3. **Status needs**: conditions? observedGeneration? summary fields?
 4. **Constraints**: enum values, ranges, patterns, max items, uniqueness
-5. **References**: target kind(s), cross-namespace?, required?, behavior when target missing
+5. **References**: target kind(s), same-namespace by default, explicit target authorization if cross-namespace, required?, behavior when target missing. See [reference authorization](./references/go-type-patterns.md#reference-authorization).
 
 If the user already has CRD YAML, treat it as the contract and map into Go types + markers.
 
