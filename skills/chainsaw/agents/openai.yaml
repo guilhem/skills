@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kyverno Chainsaw"
+  short_description: "Write, review, and debug reliable Kubernetes tests"
+  default_prompt: "Use $chainsaw to write, review, or debug reliable Kubernetes tests."

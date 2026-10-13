@@ -7,6 +7,7 @@ My personal [agent skills](https://agentskills.io/) — install them to give you
 | Skill                              | Description                                                        |
 |------------------------------------|--------------------------------------------------------------------|
 | [kubebuilder](skills/kubebuilder/) | Kubernetes operators with Kubebuilder: CRDs, controllers, webhooks |
+| [chainsaw](skills/chainsaw/) | Write, review, debug, and integrate reliable Kubernetes tests with Kyverno Chainsaw |
 | [gh-review-fix-loop](skills/gh-review-fix-loop/) | Close PR feedback with scoped fixes, validation, and thread resolution |
 | [double-review-loop](skills/double-review-loop/) | Two independent read-only reviews, only when explicitly requested |
 | [prefer-reconciliation](skills/prefer-reconciliation/) | Design lifecycle controllers around desired state and idempotent effects |
@@ -24,6 +25,24 @@ those workflows. Repository instructions and explicit user choices remain
 authoritative; the double-review skill is opt-in.
 
 See [skills.sh](https://skills.sh/) for more details.
+
+## Reliable Kubernetes tests with Chainsaw
+
+The [Chainsaw skill](skills/chainsaw/) helps test authors catch false passes,
+asynchronous assertion failures, isolation mistakes, and cleanup problems. Its
+recommendations are grounded in upstream issue discussions, fixes, and regression
+tests, with version qualifications and justified exceptions.
+
+Install it with `npx skills add guilhem/skills --skill chainsaw`, then ask:
+
+```text
+Use $chainsaw to review our Kubernetes tests for false passes and cleanup problems.
+```
+
+The agent inspects the suite and reports concrete failures and targeted corrections.
+Writing and debugging tests use the project's Chainsaw binary and test environment;
+the reference examples target v0.2.15. Local and CI guidance covers integration,
+with links to specialized tools rather than a cluster-provisioning walkthrough.
 
 ## Implementation plans: standalone skill or Codex plugin
 
