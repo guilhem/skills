@@ -11,6 +11,7 @@ My personal [agent skills](https://agentskills.io/) — install them to give you
 | [gh-review-fix-loop](skills/gh-review-fix-loop/) | Close PR feedback with scoped fixes, validation, and thread resolution |
 | [double-review-loop](skills/double-review-loop/) | Two independent read-only reviews, only when explicitly requested |
 | [prefer-reconciliation](skills/prefer-reconciliation/) | Design lifecycle controllers around desired state and idempotent effects |
+| [readme-craft](skills/readme-craft/) | Create useful READMEs with meaningful graphics and a clear path to a first result |
 | [implementation-plan](plugins/implementation-plan/skills/implementation-plan/) | Write and revise implementation plans usable without conversation history |
 
 ## Install
@@ -25,6 +26,31 @@ those workflows. Repository instructions and explicit user choices remain
 authoritative; the double-review skill is opt-in.
 
 See [skills.sh](https://skills.sh/) for more details.
+
+## README Craft
+
+Create, improve, or review a README around its purpose, useful capabilities,
+a first result, and meaningful graphics such as Mermaid diagrams and release
+or workflow badges. The skill includes targeted content, visual design, and
+verification references, plus annotated examples for applications, libraries,
+and embedded systems.
+
+```bash
+npx skills add guilhem/skills --skill readme-craft
+```
+
+With the skill available and your project open, try a bounded review:
+
+```text
+Use $readme-craft to review README.md against this repository's sources.
+Return concrete findings with locations; do not change any files.
+```
+
+The agent returns actionable findings, or reports none, with the checks performed
+and remaining limits. For an edit, name the section or reader task to improve.
+The skill can also be selected automatically. It is standalone and needs no
+plugin or other skill. Targeted edits stay proportional; the examples are
+fictional guidance, not working quick starts.
 
 ## Reliable Kubernetes tests with Chainsaw
 
