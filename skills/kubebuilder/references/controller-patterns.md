@@ -386,6 +386,8 @@ func (r *FooReconciler) SetupWithManager(mgr ctrl.Manager) error {
     r.Recorder = mgr.GetEventRecorderFor("foo-controller")
     return ctrl.NewControllerManagedBy(mgr).
         For(&cachev1.Foo{}).
+        Owns(&appsv1.Deployment{}).
+        Owns(&corev1.Service{}).
         Complete(r)
 }
 ```

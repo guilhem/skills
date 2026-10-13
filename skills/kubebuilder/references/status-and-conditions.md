@@ -239,7 +239,7 @@ func (r *FooReconciler) reconcile(ctx context.Context, foo *cachev1.Foo) (ctrl.R
         return ctrl.Result{}, err
     }
     if meta.SetStatusCondition(&foo.Status.Conditions, metav1.Condition{
-        Type: "ResourcesEnsured", Status: metav1.ConditionFalse,
+        Type: "DeploymentEnsured", Status: metav1.ConditionTrue,
         Reason: "DeploymentEnsured", Message: "Deployment spec applied; ensuring Service",
         ObservedGeneration: foo.Generation,
     }) {
