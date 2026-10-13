@@ -119,25 +119,32 @@ Inspect `config/crd/bases/` and confirm: required fields, defaults, list semanti
 
 [Kube API Linter (KAL)](https://github.com/kubernetes-sigs/kube-api-linter) is an official `kubernetes-sigs` linter that enforces the [K8s API Conventions](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md) on Go types. It catches mechanical API review issues before human review.
 
-**Install** — KAL ships as a `golangci-lint` v2 module. Add a `.custom-gcl.yml`:
+**Integrate** — reuse the project's lint target, configuration, custom binary name,
+and pinned Go/golangci-lint/KAL versions. Do not replace existing configuration or
+upgrade tools just to add KAL. If setup is missing, KAL ships as a `golangci-lint`
+v2 module; merge an entry like this into `.custom-gcl.yml`, replacing the version
+placeholders with compatible explicit pins:
 
 ```yaml
-version: v2.5.0
+version: "<project-golangci-lint-version>"
 name: golangci-lint-kube-api-linter
 destination: ./bin
 plugins:
   - module: "sigs.k8s.io/kube-api-linter"
-    version: "<pseudo-version>" # check pkg.go.dev for latest
+    version: "<pinned-KAL-pseudo-version>"
 ```
 
-Then build and run:
+Build with the pinned golangci-lint and run **report-only first**, using the
+project's configuration and actual API package paths (including multi-group layouts):
 
 ```bash
 golangci-lint custom          # builds the custom binary
-./bin/golangci-lint-kube-api-linter run ./api/...  --fix
+./bin/golangci-lint-kube-api-linter run ./api/... --fix=false
 ```
 
-**Key linters for CRDs** (enabled by default unless noted):
+**Key linters for CRDs** (upstream defaults at
+[KAL `79b557aa8c8d`](https://github.com/kubernetes-sigs/kube-api-linter/blob/79b557aa8c8dc08e801a1d3e6109881e3551bf30/docs/linters.md);
+the project's pinned version and configuration determine what runs):
 
 | Linter                      | What it checks                              |
 | --------------------------- | ------------------------------------------- |
@@ -147,13 +154,14 @@ golangci-lint custom          # builds the custom binary
 | `conditions`                | `[]metav1.Condition` tags & markers         |
 | `ssatags`                   | `listType` / `listMapKey` for SSA           |
 | `jsontags`                  | camelCase JSON tags                         |
-| `nobools`                   | Avoid bare `bool` (use string enums)        |
+| `nobools` _(off; opt-in)_    | Flag booleans for a manual API design choice |
 | `nophase`                   | No `Phase` fields in status                 |
 | `integers`                  | Only `int32` / `int64`                      |
 | `maxlength` _(off)_         | Enforce `MaxLength` / `MaxItems` bounds     |
 | `statussubresource` _(off)_ | Status subresource marker present           |
 
-**Restrict to API paths** in `.golangci.yml`:
+**Merge KAL settings and API path exclusions** into the existing `.golangci.yml`;
+retain other linters and adapt the path expression to the project:
 
 ```yaml
 version: "2"
@@ -173,7 +181,20 @@ linters:
         path-except: api/*
 ```
 
-Run KAL after `make generate` / `make manifests` and fix findings before writing tests.
+Run KAL after `make generate` / `make manifests`. Triage findings against Step 0:
+
+- For a new, unpublished API, use findings to shape the design according to the
+  user's chosen policy. `nobools` is opt-in; boolean-to-enum and Phase redesigns
+  are manual decisions, not automatic fixes.
+- For a published API or an existing CRD contract, assess Go consumer changes,
+  JSON presence/names (`omitempty`/`omitzero`), and generated CRD schema changes
+  before adopting pointer or tag fixes. Follow the user's compatibility decision;
+  if preserving the contract complicates the change and no policy is specified,
+  ask with the maintenance cost and break consequences. Do not silently redesign it.
+- Apply `--fix` only after choosing which available mechanical fixes fit that
+  scope and policy; narrow the enabled linters/packages accordingly. Review the
+  diff, regenerate, and test serialization and schema behavior as appropriate.
+  Stylistic findings need not delay writing tests.
 
 ### Step 10 — Test
 
@@ -186,11 +207,13 @@ Kubebuilder evolves across releases. Keep the scaffold aligned with ecosystem ch
 | Method                             | Best for                                 |
 | ---------------------------------- | ---------------------------------------- |
 | AutoUpdate plugin (GitHub Actions) | Ongoing automated upgrades               |
-| `kubebuilder alpha update`         | Local one-off upgrades                   |
-| `kubebuilder alpha generate`       | Baseline for heavily customized projects |
+| `kubebuilder alpha update`         | One-off upgrades in an isolated clone    |
+| `kubebuilder alpha generate`       | Separate scaffold for a manual merge     |
 | Manual migration                   | Pre-v3 projects or non-standard layouts  |
 
-See [migrations reference](./references/migrations.md).
+Both alpha commands can clean their working directory, including ignored files;
+a clean Git status is not a backup. Use a separate output or disposable clone as
+shown in the [migrations reference](./references/migrations.md).
 
 ## Common Pitfalls
 
