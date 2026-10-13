@@ -37,10 +37,18 @@ examples for applications, libraries, and embedded systems.
 npx skills add guilhem/skills --skill readme-craft
 ```
 
-Invoke `$readme-craft` for a README task, or let the agent select it automatically.
-It is standalone and needs no plugin or other skill. Targeted edits stay
-proportional; review-only requests return findings without changing files. The
-examples are fictional guidance, not working quick starts.
+With the skill available and your project open, try a bounded review:
+
+```text
+Use $readme-craft to review README.md against this repository's sources.
+Return concrete findings with locations; do not change any files.
+```
+
+The agent returns actionable findings, or reports none, with the checks performed
+and remaining limits. For an edit, name the section or reader task to improve.
+The skill can also be selected automatically. It is standalone and needs no
+plugin or other skill. Targeted edits stay proportional; the examples are
+fictional guidance, not working quick starts.
 
 ## Implementation plans: standalone skill or Codex plugin
 
